@@ -16,10 +16,6 @@ def Usage():
     print '-p,--port::<port>'
 
 def main(argv):
-    hostname=""
-    instname=""
-    port=""
-
     try:
         opts, args = getopt.getopt(argv[1:], 'ho:i:p:', ["help","hostname=","instname=","port="])
     except getopt.GetoptError, err:
@@ -57,63 +53,67 @@ def transtoarray(data):
 
 def get_aix_osinfo():
     logging.info("Begin to get osinfo:")
-    osinfo={}
-    oslevel = subprocess.Popen('oslevel -s',stdout=subprocess.PIPE, shell=True).communicate()[0]
-    if oslevel[0] not in ('7','6'):
-        oslevel = 'Error'
+    Data_get_oslevel = subprocess.Popen('oslevel -s',stdout=subprocess.PIPE, shell=True).communicate()[0]
+    if Data_get_oslevel[0] not in ('7','6'):
+        Data_get_oslevel = 'Error'
         logging.info("oslevel is not in 7.1 or 6.1")
     else:
-        oslevel = oslevel
-    memsize = subprocess.Popen('lsattr -El mem0 -a goodsize -F value',stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()[0]
-    numproc = subprocess.Popen('lsdev -Sa -Cc processor|awk \'END{print NR}\'',stdout=subprocess.PIPE, stderr=subprocess.PIPE,shell=True).communicate()[0]
-    clevel = subprocess.Popen('lslpp -l|grep -i xlc.rte',stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()[0].split()
-    jdklevel= subprocess.Popen('java -version',stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()[1]
-    timezone = subprocess.Popen('echo $TZ',stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()[0]
-    nowtime = time.strftime("%Y-%m-%d %H.%M.%S", time.localtime())
-    pgspace = subprocess.Popen('lsps -as|grep -i MB',stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()[0].replace('MB','').split()
-    osinfo = {'oslevel':oslevel[0:10].strip(),'memsize':memsize.strip(),'numproc':numproc.strip(),'clevel':clevel[1],'timezone':timezone.strip(),'nowtime':nowtime.strip(),'pgspace':pgspace[0],'jdklevel':jdklevel.replace('"','').split()[2]}
+        Data_get_oslevel = Data_get_oslevel
+    Data_get_memsize = subprocess.Popen('lsattr -El mem0 -a goodsize -F value',stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()[0]
+    Data_get_numproc = subprocess.Popen('lsdev -Sa -Cc processor|awk \'END{print NR}\'',stdout=subprocess.PIPE, stderr=subprocess.PIPE,shell=True).communicate()[0]
+    Data_get_clevel = subprocess.Popen('lslpp -l|grep -i xlc.rte',stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()[0].split()
+    Data_get_jdklevel= subprocess.Popen('java -version',stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()[1]
+    Data_get_timezone = subprocess.Popen('echo $TZ',stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()[0]
+    Data_get_nowtime = time.strftime("%Y-%m-%d %H.%M.%S", time.localtime())
+    Data_get_pgspace = subprocess.Popen('lsps -as|grep -i MB',stdout=subprocess.PIPE,stderr=subprocess.PIPE, shell=True).communicate()[0].replace('MB','').split()
+    Dict_osinfo = {'oslevel':Data_get_oslevel[0:10].strip(),'memsize':Data_get_memsize.strip(),'numproc':Data_get_numproc.strip(),\
+                   'clevel':Data_get_clevel[1],'timezone':Data_get_timezone.strip(),'nowtime':Data_get_nowtime.strip(),\
+                   'pgspace':Data_get_pgspace[0],'jdklevel':Data_get_jdklevel.replace('"','').split()[2]}
     logging.info("osinfo is collected complete!")
-    return osinfo
+    return Dict_osinfo
 
 
 def get_aix_hostsinfo():
     logging.info("Begin to get hostsinfo:")
-    hostsinfo={}
-    hostscfg={}
-    data = subprocess.Popen('cat /etc/hosts|grep -v \"#\"|grep -i "^[0-9]"|awk \'{print $1,\":\",$2,$3,$4}\'',stdout=subprocess.PIPE, shell=True).communicate()[0]
-    info = transtoarray(data)
-    for i in info:
-        if i:
-            k, v = [x.strip() for x in i.split(':')]
-            hostsinfo[k] = v
-    hostscfg['hostinfo']=hostsinfo
+    Dict_final_hsinfo={}
+    Dict_hosts_info={}
+    Data_hostsinfo = subprocess.Popen('cat /etc/hosts',stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True).communicate()[0] 
+    Data_mid_hostsinfo = re.sub('#.*|.*local.*','',Data_hostsinfo)
+    List_hostsinfo=[]
+    for Line_hostsinfo in Data_mid_hostsinfo.split('\n'):
+        if Line_hostsinfo:
+            List_hostsinfo.append(Line_hostsinfo)
+    Dict_final_hsinfo['hostinfo']=List_hostsinfo
     logging.info("hostsinfo is collected complete!")
-    return hostscfg
+    return Dict_final_hsinfo
 
-def get_db2port_info(instname):
-    logging.info("Begin to get db2portinfo:")
-    db2portinfo={}
-    db2portcfg={}
-    cmd = 'cat /etc/services|grep -i ' + instname.strip()
-    data = subprocess.Popen(cmd,stdout=subprocess.PIPE, shell=True).communicate()[0]
-    info = transtoarray(data)
-    for i in info:
-        k, v = [x.strip() for x in i.split()]
-        db2portinfo[k] = v
-    db2portcfg['db2portinfo']=db2portinfo
-    logging.info("db2portinfo is collected complete!")
-    return db2portcfg
+def get_db2port_info(instname,port):
+    logging.info("Begin to get db2 portinfo:")
+    instname=instname.lower()
+    Dict_db2_portinfo={}
+    Dict_final_db2port={}
+    Cmd_get_db2port = 'cat /etc/services|grep -i ' + instname.strip() + '|grep -i '+ port.strip()
+    Data_get_db2port = subprocess.Popen(Cmd_get_db2port,stdout=subprocess.PIPE, shell=True).communicate()[0].replace(' ','')
+##    List_get_db2port = transtoarray(Data_get_db2port)
+#    for Line_get_db2port in List_get_db2port:
+#        k, v = [x.strip() for x in Line_get_db2port.split()]
+#        Dict_db2_portinfo[k] = v
+#    Dict_final_db2port['db2portinfo']=Dict_db2_portinfo
+    Dict_final_db2port['db2portinfo']=Data_get_db2port
+    logging.info("db2 portinfo is collected complete!")
+    return Dict_final_db2port
 
 if __name__ == '__main__':
     main(sys.argv)
     hostname=sys.argv[2]
     instname=sys.argv[4]
+    port=sys.argv[6]
     lhostname=socket.gethostname()
     if lhostname!=hostname:
         sys.exit()
     else:
-        p1=get_aix_osinfo()
-        p2=get_aix_hostsinfo()
-        p3=get_db2port_info(instname)
-        pdata=dict(p1.items()+p2.items()+p3.items())
-        print json.dumps(pdata)
+        Dict_get_osinfo=get_aix_osinfo()
+        Dict_get_hostsinfo=get_aix_hostsinfo()
+        Dict_get_db2port=get_db2port_info(instname,port)
+        dict_data_result=dict(Dict_get_osinfo.items()+Dict_get_hostsinfo.items()+Dict_get_db2port.items())
+        print json.dumps(dict_data_result)

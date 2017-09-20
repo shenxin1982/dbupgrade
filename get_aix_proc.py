@@ -9,14 +9,12 @@ import socket
 import json
 
 def Usage():
-    print 'check_aix_proc.py usage:   '
+    print 'get_aix_proc.py usage:   '
     print 'use to check whether the process is exists  '
     print '-h,--help: print help message.'
     print '-o,--hostname::<hostname>'
 
 def main(argv):
-    hostname=""
-
     try:
         opts, args = getopt.getopt(argv[1:], 'ho:', ["help","hostname="])
     except getopt.GetoptError, err:
@@ -48,10 +46,10 @@ def transtoarray(data):
     return info 
 
 def get_aix_crontab():
-    cmd = 'cat /var/spool/cron/crontabs/*|grep -v \"^#\"'
-    data = subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True).communicate()[0]
-    crondict = {'crontab':data}
-    return crondict
+    cmd_get_crontab = 'cat /var/spool/cron/crontabs/*|grep -v \"^#\"'
+    data_get_crontab = subprocess.Popen(cmd_get_crontab,stdout=subprocess.PIPE,stderr=subprocess.PIPE,shell=True).communicate()[0]
+    dict_crontab = {'crontab':data_get_crontab}
+    return dict_crontab
 
 
 def get_aix_proc(proname):

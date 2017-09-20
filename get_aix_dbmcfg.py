@@ -17,10 +17,6 @@ def Usage():
     print '-v,--version::<version>'
 
 def main(argv):
-    hostname=""
-    instname=""
-    version=""
-
     try:
         opts, args = getopt.getopt(argv[1:], 'ho:i:v:', ["help","hostname=","instname=","version="])
     except getopt.GetoptError, err:
@@ -52,57 +48,27 @@ def sub_dict(form_dict, sub_keys, default=None):
     return dict([(k, form_dict.get(k.strip(), default)) for k in sub_keys.split(',')])
 
 
-def get_aix_dbmcfg(instname,version):
+def get_aix_dbmcfg(instname):
     logging.info("Begin to get dbmcfg:")
-## deal the input parameter version from V10.5.0.5 to V10.5
-    dbversion = version.upper()
-    dbversion1 = dbversion.split(".")
-    if dbversion1[0] in ('V10','V11'):
-        db2level=dbversion[0:5]
-    elif dbversion1[0] == 'V9':
-        db2level=dbversion[0:4]
+    cmd_dbmcfg = 'su - ' + instname + ' -c \"db2 get dbm cfg\"|grep \") =\";exit'
+    data_dbmcfg  = subprocess.Popen(cmd_dbmcfg,stdout=subprocess.PIPE, shell=True).communicate()[0]
+    if data_dbmcfg.find(' = ') != -1 and data_dbmcfg.find('SQLSTATE=') == -1:
+        list_dbmdata = []
+        dict_dbmcfg={}
+        for line in data_dbmcfg.split('\n'):
+            data_dbmline=re.findall('\([A-Z_]{3,}\) = .*$',line)
+            if data_dbmline:
+                data_strline =''.join(data_dbmline).replace('(','').replace(')','').replace(' = ','=')
+                data_strline1 = re.sub("=AUTOMATIC\w+","=AUTOMATIC",data_strline)
+                data_splitline = data_strline1.split('=')
+                list_dbmdata.append(data_splitline)
+        dict_dbmcfg=dict(list_dbmdata)
+#        dbminfo=sub_dict(dict_dbmcfg,'FEDERATED,DFT_MON_BUFPOOL,DFT_MON_LOCK,DFT_MON_SORT,DFT_MON_STMT,DFT_MON_TABLE,DFT_MON_TIMESTAMP,DFT_MON_UOW,HEALTH_MON,MON_HEAP_SZ,AUDIT_BUF_SZ,INSTANCE_MEMORY,SHEAPTHRES,KEEPFENCED,FENCED_POOL,NUM_INITFENCED,INDEXREC,SVCENAME,INTRA_PARALLEL')
+        logging.info("Success to get db dbmcfg End!")
+        return dict_dbmcfg
     else:
-        logging.error("invalid dbversion!")
-        retcode=-1
-        return retcode
-
-##annotate: get the instance db2level
-    dblcmd = 'su - ' + instname + ' -c \"db2level\"|grep \"DB2 v\"'
-    dbldata = subprocess.Popen(dblcmd,stdout=subprocess.PIPE, shell=True).communicate()[0].split(' ')[4]
-    dblspld = ''.join(dbldata).split('.')
-    dblevel = ''.join(dblspld[0]).upper()+'.'+''.join(dblspld[1])
-
-    if db2level == dblevel:
-        dbmcmd = 'su - ' + instname + ' -c \"db2 get dbm cfg\"|grep \") =\"'
-        dbmdata  = subprocess.Popen(dbmcmd,stdout=subprocess.PIPE, shell=True).communicate()[0]
-        if dbmdata.find(' = ') != -1 and dbmdata.find('SQLSTATE=') == -1:
-            midinfo = []
-            dbmcfg={}
-            for line in dbmdata.split('\n'):
-                dbmlinedata=re.findall('\([A-Z_]{3,}\) = .*$',line)
-                if dbmlinedata:
-                    strlinedata =''.join(dbmlinedata).replace('(','').replace(')','').replace(' = ','=')
-                    strlinedata2 = re.sub("=AUTOMATIC\w+","=AUTOMATIC",strlinedata)
-                    splitlinedata = strlinedata2.split('=')
-                    midinfo.append(splitlinedata)
-            dbmcfg=dict(midinfo)
-            if db2level in ('V9.1','V9.5','V9.7','V10.1','V10.5','V11.1'):
-#            dbminfo=sub_dict(dbmcfg,'FEDERATED,DFT_MON_BUFPOOL,DFT_MON_LOCK,DFT_MON_SORT,DFT_MON_STMT,DFT_MON_TABLE,DFT_MON_TIMESTAMP,DFT_MON_UOW,HEALTH_MON,MON_HEAP_SZ,AUDIT_BUF_SZ,INSTANCE_MEMORY,SHEAPTHRES,KEEPFENCED,FENCED_POOL,NUM_INITFENCED,INDEXREC,SVCENAME,INTRA_PARALLEL')
-                logging.info("Success to get db version v11.1 dbmcfg End!")
-                return dbmcfg
-            else:
-                logging.error("db2 version is not in:V9.1,V9.5,V9.7,V10.5,V11.1")
-                retcode=-1
-                return retcode
-        else:
-            logging.error("The ouput have something wrong!")
-            logging.error(dbmdata)
-            retcode=-1
-            return retcode
-    else:
-        logging.error("The input db2 version parameter is not match the instance db2level")
-        retcode=-1
-        return retcode
+        logging.error("Failed to get db dbmcfg !")
+        sys.exit(2)
 
 if __name__ == '__main__':
     main(sys.argv)
@@ -113,9 +79,5 @@ if __name__ == '__main__':
     if lhostname!=hostname:
         sys.exit()
     else:
-        pdata=get_aix_dbmcfg(instname,version)
-        if pdata != -1:
-            print json.dumps(pdata)
-        else:
-            logging.error("The output is wrong!")
-            sys.exit()
+        dict_data_result=get_aix_dbmcfg(instname)
+        print json.dumps(dict_data_result)
